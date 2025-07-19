@@ -37,14 +37,14 @@ function getEndpoint(username) {
 //     payload_action: { action: number }
 //   }
 // }
-function ref_typePluralize(type) {
+function ref_typePluralize(value, type) {
   switch(type) {
     case "branch":
-      return "branches";
+      return (value === 1) ? type : "branches";
     case "tag":
-      return "tags";
+      return (value === 1) ? type : "tags";
     case "repository":
-      return "repositories";
+      return (value === 1) ? type : "repositories";
   }
 }
 
@@ -77,38 +77,32 @@ function parsePullRequestEvent(key) {
   }
 }
 
+function getEventParser(eventVerbParser, eventObject, pluralizer, eventRepoPreposition) {
+  return (repo, repoEvents) => Object.keys(repoEvents).reduce((acc, key) => 
+    acc.concat(`- ${eventVerbParser(key)} ${repoEvents[key]} ${pluralizer(repoEvents[key], eventObject)} ${eventRepoPreposition} ${repo}`), []); 
+}
+
 const EVENT_PARSERS = {
   PushEvent: (repo, value) => [`- Pushed ${value} commit${(value === 1) ? "" : "s"} to ${repo}`],
   PublicEvent: (repo, value) => [`- Made ${repo} public`],
   WatchEvent: (repo, value) => [`- Starred ${repo}`],
   CreateEvent: (repo, value) => Object.keys(value).reduce((acc, key) => 
-    acc.concat(`- Created ${value[key]} ${(value[key] === 1) ? key : ref_typePluralize(key)} at ${repo}`) , []),
+    acc.concat(`- Created ${value[key]} ${ref_typePluralize(key)} at ${repo}`) , []),
   DeleteEvent: (repo, value) => Object.keys(value).reduce((acc, key) => 
-    acc.concat(`- Deleted ${value[key]} ${(value[key] === 1) ? key : ref_typePluralize(key)} from ${repo}`), []),
+    acc.concat(`- Deleted ${value[key]} ${ref_typePluralize(key)} from ${repo}`), []),
   ForkEvent: (repo, value) => Object.keys(value).reduce((acc, key) => 
     `- Forked ${repo} to ${key}`, []),
-  GollumEvent: (repo, value) => Object.keys(value).reduce((acc, key) => 
-    `- ${capitalize(key)} ${value[key]} wiki page${(value[key] === 1) ? "" : "s"} on ${repo}`, []),
-  CommitCommentEvent: (repo, value) => Object.keys(value).reduce((acc, key) => 
-    `- ${capitalize(key)} ${value[key]} commit comment${(value[key] === 1) ? "" : "s"} on ${repo}`, []),
-  IssueCommentEvent: (repo, value) => Object.keys(value).reduce((acc, key) => 
-    `- ${capitalize(key)} ${value[key]} issue/pull request comment${(value[key] === 1) ? "" : "s"} on ${repo}`, []),
-  IssuesEvent: (repo, value) => Object.keys(value).reduce((acc, key) => 
-    `- ${capitalize(key)} ${value[key]} issue${(value[key] === 1) ? "" : "s"} on ${repo}`, []),
-  MemberEvent: (repo, value) => Object.keys(value).reduce((acc, key) => 
-    `- ${capitalize(key)} ${value[key]} `, []),
-  PullRequestEvent: (repo, value) => Object.keys(value).reduce((acc, key) => 
-    `- ${parsePullRequestEvent(key)} ${value[key]} pull request${(value[key] === 1) ? "" : "s"} on ${repo}`, []),
-  PullRequestReviewEvent: (repo, value) => Object.keys(value).reduce((acc, key) =>
-    `- ${capitalize(key)} ${value[key]} pull request review${(value[key] === 1) ? "" : "s"} on ${repo}`, []),
-  PullRequestReviewCommentEvent: (repo, value) => Object.keys(value).reduce((acc, key) =>
-    `- ${capitalize(key)} ${value[key]} pull request review comment${(value[key] === 1) ? "" : "s"} on ${repo}`, []),
-  PullRequestReviewThreadEvent: (repo, value) => Object.keys(value).reduce((acc, key) =>
-    `- ${capitalize(key)} ${value[key]} pull request review thread${(value[key] === 1) ? "" : "s"} on ${repo}`, []),
-  ReleaseEvent: (repo, value) => Object.keys(value).reduce((acc, key) =>
-    `- ${capitalize(key)} ${value[key]} release event${(value[key] === 1) ? "" : "s"} on ${repo}`, []),
-  SponsorshipEvent: (repo, value) => Object.keys(value).reduce((acc, key) =>
-    `- ${capitalize(key)} ${value[key]} sponsorship event${(value[key] === 1) ? "" : "s"} on ${repo}`, []),
+  GollumEvent: getEventParser(capitalize, "wiki page", pluralize, "on"),
+  CommitCommentEvent: getEventParser(capitalize, "commit comment", pluralize, "on"),
+  IssueCommentEvent: getEventParser(capitalize, "issue/pull request comment", pluralize, "on"),
+  IssuesEvent: getEventParser(capitalize, "issue", pluralize, "on"),
+  MemberEvent: getEventParser(capitalize, "member", pluralize, "on"),
+  PullRequestEvent: getEventParser(parsePullRequestEvent, "pull request", pluralize, "on"),
+  PullRequestReviewEvent: getEventParser(capitalize, "pull request review", pluralize, "on"),
+  PullRequestReviewCommentEvent: getEventParser(capitalize, "pull request review comment", pluralize, "on"),
+  PullRequestReviewThreadEvent: getEventParser(capitalize, "pull request review thread", pluralize, "on"),
+  ReleaseEvent: getEventParser(capitalize, "release event", pluralize, "on"),
+  SponsorshipEvent: getEventParser(capitalize, "sponsorship event", pluralize, "on")
 };
 
 function parseEventList(events) {
@@ -156,17 +150,13 @@ function parseEventList(events) {
 }
 
 async function getEventList(username) {
-  try {
-    const response = await fetch(getEndpoint(username));
-    if (!response.ok) {
-      throw new Error(`Response status: ${response.status}`);
-    }
-
-    const eventList = await response.json();
-    return eventList;
-  } catch (error) {
-    console.error(`Error fetching events: ${error.message}`);
+  const response = await fetch(getEndpoint(username));
+  if (!response.ok) {
+    throw new Error(`Response status: ${response.status}`);
   }
+
+  const eventList = await response.json();
+  return eventList;
 }
 
 async function printEvents(username) {
