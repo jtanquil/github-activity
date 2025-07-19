@@ -37,14 +37,14 @@ function getEndpoint(username) {
 //     payload_action: { action: number }
 //   }
 // }
-function ref_typePluralize(value, type) {
-  switch(type) {
+function ref_typePluralize(value, eventType) {
+  switch(eventType) {
     case "branch":
-      return (value === 1) ? type : "branches";
+      return (value === 1) ? eventType : "branches";
     case "tag":
-      return (value === 1) ? type : "tags";
+      return (value === 1) ? eventType : "tags";
     case "repository":
-      return (value === 1) ? type : "repositories";
+      return (value === 1) ? eventType : "repositories";
   }
 }
 
@@ -52,12 +52,12 @@ function pluralize(value, word) {
   return (value === 1) ? word : word + "s";
 }
 
-function capitalize(str) {
-  return str[0].toUpperCase() + str.slice(1);
+function capitalize(word) {
+  return word[0].toUpperCase() + word.slice(1);
 }
 
-function parsePullRequestEvent(key) {
-  switch (key) {
+function parsePullRequestEvent(eventType) {
+  switch (eventType) {
     case "opened":
     case "edited":
     case "closed":
@@ -67,7 +67,7 @@ function parsePullRequestEvent(key) {
     case "unassigned":
     case "labeled":
     case "unlabeled":
-      return capitalize(key);
+      return capitalize(eventType);
     case "review_requested":
       return "Requested a review on";
     case "review_request_removed":
@@ -78,20 +78,20 @@ function parsePullRequestEvent(key) {
 }
 
 function getEventParser(eventVerbParser, eventObject, pluralizer, eventRepoPreposition) {
-  return (repo, repoEvents) => Object.keys(repoEvents).reduce((acc, key) => 
-    acc.concat(`- ${eventVerbParser(key)} ${repoEvents[key]} ${pluralizer(repoEvents[key], eventObject)} ${eventRepoPreposition} ${repo}`), []); 
+  return (repo, repoEvents) => Object.keys(repoEvents).reduce((acc, eventType) => 
+    acc.concat(`- ${eventVerbParser(eventType)} ${repoEvents[eventType]} ${pluralizer(repoEvents[eventType], eventObject)} ${eventRepoPreposition} ${repo}`), []); 
 }
 
 const EVENT_PARSERS = {
-  PushEvent: (repo, value) => [`- Pushed ${value} commit${(value === 1) ? "" : "s"} to ${repo}`],
-  PublicEvent: (repo, value) => [`- Made ${repo} public`],
-  WatchEvent: (repo, value) => [`- Starred ${repo}`],
-  CreateEvent: (repo, value) => Object.keys(value).reduce((acc, key) => 
-    acc.concat(`- Created ${value[key]} ${ref_typePluralize(key)} at ${repo}`) , []),
-  DeleteEvent: (repo, value) => Object.keys(value).reduce((acc, key) => 
-    acc.concat(`- Deleted ${value[key]} ${ref_typePluralize(key)} from ${repo}`), []),
-  ForkEvent: (repo, value) => Object.keys(value).reduce((acc, key) => 
-    `- Forked ${repo} to ${key}`, []),
+  PushEvent: (repo, repoEvents) => [`- Pushed ${repoEvents} commit${(repoEvents === 1) ? "" : "s"} to ${repo}`],
+  PublicEvent: (repo, repoEvents) => [`- Made ${repo} public`],
+  WatchEvent: (repo, repoEvents) => [`- Starred ${repo}`],
+  CreateEvent: (repo, repoEvents) => Object.keys(repoEvents).reduce((acc, eventType) => 
+    acc.concat(`- Created ${repoEvents[eventType]} ${ref_typePluralize(repoEvents[eventType], eventType)} at ${repo}`) , []),
+  DeleteEvent: (repo, repoEvents) => Object.keys(repoEvents).reduce((acc, eventType) => 
+    acc.concat(`- Deleted ${repoEvents[eventType]} ${ref_typePluralize(repoEvents[eventType], eventType)} from ${repo}`), []),
+  ForkEvent: (repo, repoEvents) => Object.keys(repoEvents).reduce((acc, eventType) => 
+    `- Forked ${repo} to ${eventType}`, []),
   GollumEvent: getEventParser(capitalize, "wiki page", pluralize, "on"),
   CommitCommentEvent: getEventParser(capitalize, "commit comment", pluralize, "on"),
   IssueCommentEvent: getEventParser(capitalize, "issue/pull request comment", pluralize, "on"),
